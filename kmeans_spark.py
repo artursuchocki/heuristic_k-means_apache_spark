@@ -36,12 +36,8 @@ SpSession = SparkSession \
 #Get the Spark Context from Spark Session    
 SpContext = SpSession.sparkContext
 
-autoData = SpContext.textFile("file:/Users/suchy/Downloads/K_Means-2/data.txt")
-autoData.cache()
+dataLines = SpContext.textFile("file:///Users/suchy/Downloads/K_Means-2/data.txt")
 
-#Remove the first line (contains headers)
-firstLine = autoData.first()
-dataLines = autoData.filter(lambda x: x != firstLine)
 dataLines.count()
 
 from pyspark.sql import Row
@@ -49,35 +45,81 @@ from pyspark.sql import Row
 import math
 from pyspark.ml.linalg import Vectors
 
+    
 #Convert to Local Vector.
 def transformToNumeric( inputStr) :
-    attList=inputStr.split(",")
+    attList=inputStr.split()
 
-    doors = 1.0 if attList[3] =="two" else 2.0
-    body = 1.0 if attList[4] == "sedan" else 2.0 
-       
-    #Filter out columns not wanted at this stage
-    values= Row(DOORS= doors, \
-                     BODY=float(body),  \
-                     HP=float(attList[7]),  \
-                     RPM=float(attList[8]),  \
-                     MPG=float(attList[9])  \
-                     )
+    values=      Row(c0=float(attList[0]),  \
+    		c1=float(attList[1]),  \
+    		c2=float(attList[2]),  \
+    		c3=float(attList[3]),  \
+    		c4=float(attList[4]),  \
+    		c5=float(attList[5]),  \
+    		c6=float(attList[6]),  \
+    		c7=float(attList[7]),  \
+    		c8=float(attList[8]),  \
+    		c9=float(attList[9]),  \
+    		c10=float(attList[10]),  \
+    		c11=float(attList[11]),  \
+    		c12=float(attList[12]),  \
+		c13=float(attList[13]),  \
+		c14=float(attList[14]),  \
+		c15=float(attList[15]),  \
+		c16=float(attList[16]),  \
+		c17=float(attList[17]),  \
+		c18=float(attList[18]),  \
+		c19=float(attList[19]),  \
+		c20=float(attList[20]),  \
+		c21=float(attList[21]),  \
+		c22=float(attList[22]),  \
+		c23=float(attList[23]),  \
+		c24=float(attList[24]),  \
+		c25=float(attList[25]),  \
+		c26=float(attList[26]),  \
+		c27=float(attList[27]),  \
+		c28=float(attList[28]),  \
+		c29=float(attList[29]),  \
+		c30=float(attList[30]),  \
+		c31=float(attList[31]),  \
+		c32=float(attList[32]),  \
+		c33=float(attList[33]),  \
+		c34=float(attList[34]),  \
+		c35=float(attList[35]),  \
+		c36=float(attList[36]),  \
+		c37=float(attList[37]),  \
+		c38=float(attList[38]),  \
+		c39=float(attList[39]),  \
+		c40=float(attList[40]),  \
+		c41=float(attList[41]),  \
+		c42=float(attList[42]),  \
+		c43=float(attList[43]),  \
+		c44=float(attList[44]),  \
+		c45=float(attList[45]),  \
+		c46=float(attList[46]),  \
+		c47=float(attList[47]),  \
+		c48=float(attList[48]),  \
+		c49=float(attList[49]),  \
+		c50=float(attList[50]),  \
+		c51=float(attList[51]),  \
+		c52=float(attList[52]),  \
+		c53=float(attList[53]),  \
+		c54=float(attList[54])		
+             )
     return values
 
-autoMap = dataLines.map(transformToNumeric)
-autoMap.persist()
-autoMap.collect()
+numericData = dataLines.map(transformToNumeric)
+numericData.collect()
 
-autoDf = SpSession.createDataFrame(autoMap)
-autoDf.show()
+dataDf = SpSession.createDataFrame(numericData)
+
 
 #Centering and scaling. To perform this every value should be subtracted
 #from that column's mean and divided by its Std. Deviation.
 
-summStats=autoDf.describe().toPandas()
-meanValues=summStats.iloc[1,1:5].values.tolist()
-stdValues=summStats.iloc[2,1:5].values.tolist()
+summStats=dataDf.describe().toPandas()
+meanValues=summStats.iloc[1,1:55].values.tolist()
+stdValues=summStats.iloc[2,1:55].values.tolist()
 
 #place the means and std.dev values in a broadcast variable
 bcMeans=SpContext.broadcast(meanValues)
@@ -96,27 +138,29 @@ def centerAndScale(inRow) :
             float(stdArray[i]) )
     return Vectors.dense(retArray)
     
-csAuto = autoDf.rdd.map(centerAndScale)
-csAuto.collect()
+dataNormalized = dataDf.rdd.map(centerAndScale)
+dataNormalized.collect()
 
 #Create a Spark Data Frame
-autoRows=csAuto.map( lambda f:Row(features=f))
-autoDf = SpSession.createDataFrame(autoRows)
+dataRows=dataNormalized.map( lambda f:Row(features=f))
+finalDf = SpSession.createDataFrame(dataRows)
 
-autoDf.select("features").show(10)
+finalDf.select("features").show(10)
 
 from pyspark.ml.clustering import KMeans
-kmeans = KMeans(k=3, seed=1)
-model = kmeans.fit(autoDf)
-predictions = model.transform(autoDf)
-predictions.show()
-
+kmeans = KMeans(k=50, seed=10)
+model = kmeans.fit(finalDf)
+predictions = model.transform(finalDf)
+predictions.select("prediction").take(360)
+predictions.groupBy("prediction").count().sort("count", ascending=False).show(51)
 #Plot the results in a scatter plot
 import pandas as pd
 
+
+#sample plot according to chosen 16th and 20th feature
 def unstripData(instr) :
     return ( instr["prediction"], instr["features"][0], \
-        instr["features"][1],instr["features"][2],instr["features"][3])
+        instr["features"][1],instr["features"][15],instr["features"][19])
     
 unstripped=predictions.rdd.map(unstripData)
 predList=unstripped.collect()
